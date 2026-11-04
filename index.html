@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DDL 待办</title>
+<title>DDL Board</title>
 <style>
   :root {
     --bg: #ffffff;
@@ -405,6 +405,7 @@
 
   function applyStaticStrings() {
     document.title = tr('PLUGIN.NAME');
+    document.documentElement.lang = curLang === 'zh' ? 'zh-CN' : 'en';
     document.getElementById('prev').title = tr('UI.PREV_MONTH');
     document.getElementById('next').title = tr('UI.NEXT_MONTH');
     document.getElementById('todayBtn').textContent = tr('UI.BACK_TO_TODAY');
@@ -496,6 +497,11 @@
     statusEl.style.display = 'block';
   }
 
+  function clearError() {
+    statusEl.style.display = 'none';
+    statusEl.textContent = '';
+  }
+
   // ---- 数据层 ----
 
   function ensureTag() {
@@ -528,8 +534,9 @@
         return t.tagIds && t.tagIds.indexOf(tagId) !== -1 && !t.parentId;
       });
       render();
+      clearError();
     }).catch(function (e) {
-      showError(t('MSG.LOAD_FAIL', { msg: e && e.message ? e.message : e }));
+      showError(tr('MSG.LOAD_FAIL', { msg: e && e.message ? e.message : e }));
     });
   }
 
@@ -554,14 +561,15 @@
   }
 
   function createTodo(title, dateStr, timeStr) {
-    if (timeStr) {
-      // 带具体时间：先建任务，再写 dueWithTime（与 dueDay 互斥）
+    // 先以全天 dueDay 落库；带时间再转 dueWithTime。这样即使第二步失败，
+    // 任务也仍带截止日期、能在看板上看到，不会变成无日期的孤儿任务。
+    return PluginAPI.addTask({ title: title, tagIds: [tagId], dueDay: dateStr }).then(function (id) {
+      if (!timeStr) return id;
       var ts = new Date(dateStr + 'T' + timeStr + ':00').getTime();
-      return PluginAPI.addTask({ title: title, tagIds: [tagId] }).then(function (id) {
-        return PluginAPI.updateTask(id, { dueWithTime: ts, dueDay: null });
+      return PluginAPI.updateTask(id, { dueWithTime: ts, dueDay: null }).then(function () {
+        return id;
       });
-    }
-    return PluginAPI.addTask({ title: title, tagIds: [tagId], dueDay: dateStr });
+    });
   }
 
   function updateTodo(id, title, dateStr, timeStr) {
@@ -772,7 +780,9 @@
       viewMonth = parseInt(parts[1], 10) - 1;
       return reload();
     }).catch(function (e) {
-      showError((isEdit ? tr('MSG.SAVE_FAIL') : tr('MSG.CREATE_FAIL')) + (e && e.message ? e.message : e));
+      showError(tr(isEdit ? 'MSG.SAVE_FAIL' : 'MSG.CREATE_FAIL', {
+        msg: e && e.message ? e.message : e,
+      }));
     });
   }
 
@@ -831,7 +841,7 @@
 
   function start() {
     if (typeof PluginAPI === 'undefined') {
-      showError('PluginAPI not found: open this plugin inside Super Productivity.');
+      showError(tr('MSG.NO_API'));
       return;
     }
     buildSwatches();
@@ -865,11 +875,19 @@
             }
           });
         } catch (e) { /* 宿主不支持时忽略 */ }
-        // "System default" 的进出不派发钩子，周期自检是唯一可靠通道
+        // "System default" 的进出不派发钩子，周期自检是唯一可靠通道；
+        // 同时检测跨日，刷新“今天”高亮与逾期状态。
+        var lastDay = fmtDateObj(new Date());
         setInterval(function () {
           var prev = curLang;
+          var day = fmtDateObj(new Date());
           detectLang().then(function () {
-            if (curLang !== prev) {
+            var changed = curLang !== prev;
+            if (day !== lastDay) {
+              lastDay = day;
+              changed = true;
+            }
+            if (changed) {
               applyStaticStrings();
               render();
             }

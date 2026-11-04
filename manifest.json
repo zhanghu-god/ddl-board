@@ -17,6 +17,7 @@
     "persistDataSynced",
     "loadSyncedData"
   ],
+  "dataSharing": [],
   "iFrame": true,
   "type": "standard",
   "icon": "icon.svg",

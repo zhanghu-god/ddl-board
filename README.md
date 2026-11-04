@@ -26,6 +26,10 @@ English UI — month board with deadline todos; completed items greyed and sunk 
 
 Requires Super Productivity ≥ 13.0.0 (developed and tested on 19.2.0).
 
+## Upgrading from `ddl-todos-board` (≤ 1.6.x)
+
+The plugin id changed from `ddl-todos-board` to `ddl-board` in v1.7.0. Super Productivity treats it as a separate plugin, so remove the old entry in **Settings → Plugins**, install the new ZIP, and restart the app. Existing `DDL` tasks and the tag are preserved; the plugin’s saved color preferences start from the defaults again.
+
 ## Usage notes
 
 - The board lives in the main content area as its own view (left-sidebar entry), not in the built-in Schedule view — plugins cannot modify core views.
